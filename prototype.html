@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桌面待办 - 原型预览（新版）</title>
+    <style>
+      /* ===== 模拟桌面壁纸 ===== */
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #6dd5ed 100%);
+        font-family: -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: #2b2b2b;
+      }
+      .hint-bar {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        text-align: center;
+        max-width: 80%;
+      }
+
+      /* 可拖动的透明窗口卡片 */
+      .window {
+        width: 380px;
+        min-height: 540px;
+        max-height: 80vh;
+        background: rgba(255, 255, 255, 0.93);
+        border-radius: 14px;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+        transition: opacity 0.15s;
+        position: absolute;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        cursor: move;
+      }
+      .topbar select {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: 14px;
+        font-weight: 600;
+        outline: none;
+        cursor: pointer;
+      }
+      .icon-btn {
+        border: none;
+        background: transparent;
+        font-size: 15px;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      .icon-btn:hover { background: rgba(0,0,0,0.06); }
+
+      .list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px;
+      }
+      .todo {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 4px;
+        border-radius: 8px;
+      }
+      .todo:hover { background: rgba(0,0,0,0.05); }
+      .todo.new { background: rgba(255,255,255,0.5); }
+      .todo.done .title { text-decoration: line-through; color: #6b6b6b; }
+      .todo.pinned { background: rgba(255,193,7,0.16); }
+      .handle { cursor: grab; color: #6b6b6b; font-size: 13px; padding-top: 2px; opacity: 0; }
+      .todo:hover .handle { opacity: 1; }
+      .check { width: 16px; height: 16px; margin-top: 2px; border: 2px solid #6b6b6b; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
+      .todo.done .check { background: #ffc107; border-color: #ffc107; }
+      .body { flex: 1; min-width: 0; }
+      .title { word-break: break-word; line-height: 1.4; }
+      .title-input { width: 100%; border: none; background: rgba(255,255,255,0.7); border-radius: 4px; padding: 2px 4px; font-size: 14px; outline: none; }
+      .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+      .chip { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: rgba(0,0,0,0.07); color: #555; }
+      .countdown { font-size: 11px; color: #c2410c; margin-top: 3px; }
+      .actions { display: none; gap: 2px; flex-shrink: 0; }
+      .todo:hover .actions { display: flex; }
+      .actions .icon-btn { font-size: 13px; opacity: 0.7; }
+      .actions .icon-btn:hover { opacity: 1; }
+      .actions .del:hover { color: #e5484d; }
+
+      .resize-grip {
+        position: absolute;
+        right: 0; bottom: 0;
+        width: 18px; height: 18px;
+        cursor: se-resize;
+        background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.25) 50%);
+        border-radius: 0 0 14px 0;
+      }
+      .resize-grip:hover { background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.45) 50%); }
+
+      .drawer-mask {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.25);
+        display: none; align-items: stretch; justify-content: flex-end;
+      }
+      .drawer-mask.open { display: flex; }
+      .drawer {
+        width: 320px; height: 100%; background: #fafafa;
+        padding: 16px; overflow-y: auto;
+      }
+      .drawer .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+      .drawer h3 { margin: 14px 0 8px; font-size: 12px; color: #888; text-transform: uppercase; }
+      .drawer input[type="text"], .drawer input[type="date"], .drawer select, .drawer textarea {
+        width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font-size: 13px; margin-bottom: 6px;
+      }
+      .drawer textarea { min-height: 80px; resize: vertical; }
+      .drawer button { border: none; background: #ffc107; color: #333; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+      .drawer button.danger { background: #e5484d; color: #fff; }
+      .checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 6px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; }
+      .hint { font-size: 11px; color: #888; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <div class="hint-bar">新版原型：可拖拽移动窗口、右下角调整大小、点击列表空白添加、每条待办有「详情」按钮</div>
+
+    <div class="window" id="win">
+      <div class="topbar" id="topbar">
+        <select id="listSelect"></select>
+        <button class="icon-btn" id="hideBtn" title="隐藏">👁</button>
+        <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+      </div>
+      <div class="list" id="todoList"></div>
+      <div class="resize-grip" id="resizeGrip" title="拖拽调整大小"></div>
+    </div>
+
+    <div class="drawer-mask" id="drawerMask">
+      <div class="drawer" id="drawer"></div>
+    </div>
+
+    <script>
+      let todos = [
+        { id: 1, title: "给妈妈买生日礼物", done: false, pinned: true, tags: ["家庭"], target: null, note: "" },
+        { id: 2, title: "周三 10:00 项目评审会", done: false, pinned: false, tags: ["工作"], target: null, note: "" },
+        { id: 3, title: "去一趟拉萨", done: false, pinned: false, tags: [], target: "2026-12-25", note: "一定要坐青藏铁路" },
+        { id: 4, title: "回复客户邮件", done: true, pinned: false, tags: ["工作"], target: null, note: "" },
+      ];
+      let tagDefs = [
+        { name: "工作", color: "#ff6b6b" },
+        { name: "家庭", color: "#4dabf7" },
+      ];
+      let lists = ["我的待办", "工作清单"];
+      let currentList = "我的待办";
+      let nextId = 5;
+      let drawerType = null; // 'settings' | 'detail' | null
+      let detailId = null;
+
+      const $ = (id) => document.getElementById(id);
+      const winEl = $("win");
+      const topbar = $("topbar");
+      let dragOffset = { x: 0, y: 0 };
+
+      function countdownLabel(target) {
+        const t = new Date(target + "T00:00:00");
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const days = Math.round((t - today) / 86400000);
+        return days < 0 ? `已经 ${-days} 天` : `还有 ${days} 天`;
+      }
+
+      function render() {
+        $("listSelect").innerHTML = lists
+          .map((l) => `<option ${l === currentList ? "selected" : ""}>${l}</option>`)
+          .join("");
+        const sorted = [...todos].sort((a, b) => {
+          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          return a.id - b.id;
+        });
+        $("todoList").innerHTML = sorted
+          .map(
+            (t) => `
+          <div class="todo ${t.done ? "done" : ""} ${t.pinned ? "pinned" : ""}" data-id="${t.id}">
+            <span class="handle">⋮⋮</span>
+            <span class="check" data-act="check"></span>
+            <div class="body">
+              <div class="title">${t.title}</div>
+              ${t.tags.length ? `<div class="chips">${t.tags.map((name) => `<span class="chip">${name}</span>`).join("")}</div>` : ""}
+              ${t.target ? `<div class="countdown">${countdownLabel(t.target)}</div>` : ""}
+            </div>
+            <div class="actions">
+              <button class="icon-btn" data-act="detail" title="详情">🔧</button>
+              <button class="icon-btn" data-act="pin" title="置顶">${t.pinned ? "📍" : "📌"}</button>
+              <button class="icon-btn del" data-act="del" title="删除">🗑</button>
+            </div>
+          </div>`,
+          )
+          .join("");
+      }
+
+      // 拖拽移动窗口
+      topbar.addEventListener("mousedown", (e) => {
+        if (e.target.closest("select") || e.target.closest("button")) return;
+        dragOffset.x = e.clientX - winEl.offsetLeft;
+        dragOffset.y = e.clientY - winEl.offsetTop;
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", () => {
+          document.removeEventListener("mousemove", onMove);
+        }, { once: true });
+      });
+      function onMove(e) {
+        winEl.style.left = e.clientX - dragOffset.x + "px";
+        winEl.style.top = e.clientY - dragOffset.y + "px";
+      }
+
+      // 调整大小
+      const grip = $("resizeGrip");
+      let resizeStart = { x: 0, y: 0, w: 0, h: 0 };
+      grip.addEventListener("mousedown", (e) => {
+        resizeStart = { x: e.clientX, y: e.clientY, w: winEl.offsetWidth, h: winEl.offsetHeight };
+        document.addEventListener("mousemove", onResize);
+        document.addEventListener("mouseup", () => document.removeEventListener("mousemove", onResize), { once: true });
+      });
+      function onResize(e) {
+        winEl.style.width = Math.max(280, resizeStart.w + e.clientX - resizeStart.x) + "px";
+        winEl.style.height = Math.max(300, resizeStart.h + e.clientY - resizeStart.y) + "px";
+      }
+
+      $("todoList").addEventListener("click", (e) => {
+        const actEl = e.target.closest("[data-act]");
+        const row = e.target.closest(".todo");
+        if (actEl) {
+          const act = actEl.dataset.act;
+          const id = Number(row?.dataset.id);
+          const t = todos.find((x) => x.id === id);
+          if (act === "check") t.done = !t.done;
+          if (act === "pin") t.pinned = !t.pinned;
+          if (act === "del") todos = todos.filter((x) => x.id !== id);
+          if (act === "detail") openDetail(id);
+          if (act === "closeDrawer") closeDrawer();
+          if (act === "saveDetail") saveDetail();
+          if (act === "deleteDetail") { todos = todos.filter((x) => x.id !== detailId); closeDrawer(); }
+          if (act === "addTag") addTag();
+          if (act === "addList") addList();
+          render();
+          return;
+        }
+        if (!row && e.target.closest(".list") === $("todoList")) createNewInput();
+      });
+
+      function createNewInput() {
+        if ($("todoList").querySelector(".new-input")) return;
+        const row = document.createElement("div");
+        row.className = "todo new";
+        row.innerHTML = `<span class="handle"></span><span class="check"></span><div class="body"><input class="title-input new-input" type="text" placeholder="输入待办，回车添加" /></div><div class="actions"></div>`;
+        $("todoList").appendChild(row);
+        const input = row.querySelector(".new-input");
+        input.focus();
+        input.addEventListener("blur", () => {
+          if (input.value.trim()) todos.push({ id: nextId++, title: input.value.trim(), done: false, pinned: false, tags: [], target: null, note: "" });
+          render();
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && input.value.trim()) {
+            todos.push({ id: nextId++, title: input.value.trim(), done: false, pinned: false, tags: [], target: null, note: "" });
+            render();
+          }
+          if (e.key === "Escape") render();
+        });
+      }
+
+      $("listSelect").addEventListener("change", (e) => (currentList = e.target.value));
+      $("settingsBtn").addEventListener("click", openSettings);
+      $("hideBtn").addEventListener("click", () => {
+        winEl.style.display = "none";
+        setTimeout(() => (winEl.style.display = ""), 1500);
+      });
+      $("drawerMask").addEventListener("click", (e) => { if (e.target === $("drawerMask")) closeDrawer(); });
+
+      function openSettings() {
+        drawerType = "settings";
+        const tagItems = tagDefs.map((t) => `<div class="tag-item"><span class="dot" style="background:${t.color}"></span>${t.name}</div>`).join("");
+        const listItems = lists.map((l) => `<div class="tag-item">• ${l}</div>`).join("");
+        $("drawer").innerHTML = `
+          <div class="row"><strong>设置</strong><button data-act="closeDrawer">关闭</button></div>
+          <h3>外观</h3>
+          <div class="row"><span>窗口透明度</span><input id="opacity" type="range" min="0.3" max="1" step="0.05" value="0.93" /></div>
+          <h3>开机启动</h3>
+          <div class="row"><span>开机自动启动</span><input id="autostart" type="checkbox" /></div>
+          <h3>标签</h3>${tagItems || '<div class="hint">暂无标签</div>'}
+          <div class="row"><input id="tagName" type="text" placeholder="标签名" /><input id="tagColor" type="color" value="#FFC107" style="width:38px;border:none;background:none;padding:0" /></div>
+          <button data-act="addTag">添加标签</button>
+          <h3>清单</h3>${listItems || '<div class="hint">暂无其他清单</div>'}
+          <div class="row"><input id="listName" type="text" placeholder="新清单名" /></div>
+          <button data-act="addList">添加清单</button>
+        `;
+        $("drawerMask").classList.add("open");
+        $("opacity").addEventListener("input", (e) => (winEl.style.opacity = e.target.value));
+      }
+
+      function addTag() {
+        const n = $("tagName").value.trim();
+        if (!n) return;
+        tagDefs.push({ name: n, color: $("tagColor").value });
+        openSettings();
+      }
+      function addList() {
+        const n = $("listName").value.trim();
+        if (!n) return;
+        lists.push(n);
+        openSettings();
+      }
+
+      function openDetail(id) {
+        detailId = id;
+        drawerType = "detail";
+        const t = todos.find((x) => x.id === id);
+        const tagOptions = tagDefs
+          .map((tag) => `<label class="checkbox-row"><input type="checkbox" name="detailTag" value="${tag.name}" ${t.tags.includes(tag.name) ? "checked" : ""} /><span class="dot" style="background:${tag.color}"></span><span>${tag.name}</span></label>`)
+          .join("");
+        $("drawer").innerHTML = `
+          <div class="row"><strong>待办详情</strong><button data-act="closeDrawer">关闭</button></div>
+          <h3>标题</h3><input id="detailTitle" type="text" value="${t.title}" />
+          <h3>类型</h3>
+          <select id="detailType"><option value="task" ${t.target ? "" : "selected"}>普通待办</option><option value="countdown" ${t.target ? "selected" : ""}>日期倒数</option></select>
+          <h3>目标日期</h3><input id="detailTarget" type="date" value="${t.target || ""}" />
+          <h3>标签</h3>${tagOptions || '<div class="hint">暂无标签</div>'}
+          <h3>备注</h3><textarea id="detailNote">${t.note}</textarea>
+          <div class="row" style="margin-top:12px"><button class="danger" data-act="deleteDetail">删除</button><button data-act="saveDetail">保存</button></div>
+        `;
+        $("drawerMask").classList.add("open");
+      }
+
+      function saveDetail() {
+        const t = todos.find((x) => x.id === detailId);
+        t.title = $("detailTitle").value.trim() || t.title;
+        const type = $("detailType").value;
+        t.target = type === "countdown" ? $("detailTarget").value || null : null;
+        t.note = $("detailNote").value;
+        t.tags = Array.from(document.querySelectorAll("input[name='detailTag']:checked")).map((c) => c.value);
+        closeDrawer();
+        render();
+      }
+
+      function closeDrawer() {
+        drawerType = null;
+        detailId = null;
+        $("drawerMask").classList.remove("open");
+      }
+
+      render();
+    </script>
+  </body>
+</html>

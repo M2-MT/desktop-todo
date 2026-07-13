@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "桌面待办",
+  "version": "0.1.0",
+  "identifier": "com.desktoptodo.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "桌面待办",
+        "width": 400,
+        "height": 600,
+        "minWidth": 400,
+        "minHeight": 400,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": true,
+        "shadow": false,
+        "visible": true,
+        "center": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "透明桌面待办清单",
+    "longDescription": "嵌入式透明桌面待办清单工具，支持待办增删改、标签分类、多清单、日期倒数。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {}
+}
