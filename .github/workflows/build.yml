@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: setup-node@v4
         with:
           node-version: "20"
 
@@ -33,38 +33,75 @@ jobs:
         run: pnpm tauri build
         shell: pwsh
 
-      - name: Publish to GitHub Release
+      - name: Publish to GitHub Release (兜底下载源)
         uses: softprops/action-gh-release@v2
         if: success()
         continue-on-error: true
         with:
           tag_name: latest
           name: 桌面待办 自动构建
+          overwrite: true
           files: src-tauri/target/release/bundle/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to Gitee Release
+      - name: Publish to Gitee Release (主下载源)
         if: success()
+        continue-on-error: true
         shell: bash
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          # 创建 Gitee Release（若 tag 已存在则改为获取已有 Release）
-          RESP=$(curl -s -X POST "https://gitee.com/api/v5/repos/minting2/desktop-todo/releases" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: token $GITEE_TOKEN" \
-            -d '{"tag_name":"latest","name":"桌面待办 自动构建","body":"由 GitHub Actions 自动构建并同步"}')
-          RELEASE_ID=$(echo "$RESP" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
-          if [ -z "$RELEASE_ID" ]; then
-            RESP=$(curl -s "https://gitee.com/api/v5/repos/minting2/desktop-todo/releases/tags/latest" \
-              -H "Authorization: token $GITEE_TOKEN")
-            RELEASE_ID=$(echo "$RESP" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
-          fi
-          echo "Gitee Release ID: $RELEASE_ID"
-          # 上传每个安装包（msi / exe / nsis.zip）
-          for f in $(find src-tauri/target/release/bundle -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.nsis.zip" \)); do
-            echo "Uploading $f"
-            curl -s -X POST "https://gitee.com/api/v5/repos/minting2/desktop-todo/releases/$RELEASE_ID/attachments?access_token=$GITEE_TOKEN" \
-              -F "file=@$f"
+          set +e
+          API="https://gitee.com/api/v5/repos/minting2/desktop-todo"
+          TOKEN="$GITEE_TOKEN"
+          TAG="build-${{ github.run_number }}"
+          NAME="桌面待办 构建 #${{ github.run_number }}"
+          BODY="由 GitHub Actions 自动构建（运行 #${{ github.run_number }}，提交 ${{ github.sha }}）。始终下载 Gitee 发行版中最上方（最新）的那一条即可。"
+
+          # 1) 创建 Gitee 发行版（必须带 target_commitish，否则 Gitee 报错；遇 502 网关抖动自动重试）
+          RID=""
+          RESP=""
+          for i in 1 2 3; do
+            RESP=$(curl -s -w "\nHTTP:%{http_code}" -X POST "$API/releases" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: token $TOKEN" \
+              -d "{\"tag_name\":\"$TAG\",\"name\":\"$NAME\",\"body\":\"$BODY\",\"target_commitish\":\"master\",\"prerelease\":false}")
+            CODE=$(printf '%s' "$RESP" | tail -1 | grep -o '[0-9]*')
+            if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
+              RID=$(printf '%s' "$RESP" | sed '$d' | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
+              echo "✅ 发行版已创建 RELEASE_ID=$RID (HTTP $CODE)"
+              break
+            fi
+            echo "⚠️ 创建发行版失败 HTTP:$CODE (第 $i 次尝试)，3 秒后重试"
+            sleep 3
           done
+          if [ -z "$RID" ]; then
+            echo "::error::Gitee 发行版创建失败，最后响应: $RESP"
+            echo "（GitHub Release 仍可作为兜底下载源）"
+            exit 0
+          fi
+
+          # 2) 上传安装包（.exe / .nsis.zip），遇 502 重试最多 5 次
+          find src-tauri/target/release/bundle -type f \( -name "*.exe" -o -name "*.nsis.zip" \) -print0 | while IFS= read -r -d '' f; do
+            echo "📤 上传: $f"
+            ok=0
+            UP=""
+            for i in 1 2 3 4 5; do
+              UP=$(curl -s -w "\nHTTP:%{http_code}" -X POST "$API/releases/$RID/attach_files" \
+                -F "file=@$f" -F "access_token=$TOKEN")
+              UCODE=$(printf '%s' "$UP" | tail -1 | grep -o '[0-9]*')
+              if [ "$UCODE" = "200" ] || [ "$UCODE" = "201" ]; then
+                echo "  ✅ 上传成功 (HTTP $UCODE)"
+                ok=1
+                break
+              fi
+              echo "  ⚠️ 上传失败 HTTP:$UCODE (第 $i 次尝试)，3 秒后重试"
+              sleep 3
+            done
+            if [ "$ok" = "0" ]; then
+              echo "::error::附件上传失败: $f，最后响应: $UP"
+            fi
+          done
+
+          echo "🎉 Gitee 发布完成，下载地址: https://gitee.com/minting2/desktop-todo/releases"
