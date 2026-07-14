@@ -7,6 +7,17 @@
 
 ---
 
+## 📦 产出物速查
+
+| 类别 | 文件 | 说明 | 打开方式 |
+|------|------|------|----------|
+| **产品原型** | [`prototype.html`](./prototype.html) | 高保真可交互原型（透明窗口 / 四边四角缩放 / 点空白添加 / 详情抽屉） | 下载 ZIP 后双击用浏览器打开 |
+| **需求规划** | [`docs/需求沟通记录.md`](./docs/需求沟通记录.md) | 需求池、Roadmap、决策日志、REQ-001 等 |
+| **产出索引** | [`docs/产出物清单.md`](./docs/产出物清单.md) | 按时间 / 类别列出所有关键文件，方便查找 |
+| **使用指南** | [`docs/GET_STARTED_WINDOWS.md`](./docs/GET_STARTED_WINDOWS.md) | Windows 上从零运行 / 打包的详细步骤 |
+
+---
+
 ## ✨ MVP 功能
 
 - ✅ 透明、置顶、无边框的桌面窗口，适配任意壁纸
@@ -87,10 +98,15 @@ pnpm dev            # 打开 http://localhost:1420 即可预览界面
 ```
 desktop-todo/
 ├── prototype.html          # 高保真可交互原型（浏览器双击打开即可预览）
+├── README.md               # 项目总览与产出物速查
 ├── index.html              # 前端入口
 ├── package.json
 ├── vite.config.ts          # Vite + Vitest 配置
 ├── generate_icon.py        # 生成应用图标
+├── docs/                   # 需求、规划、使用指南等文档
+│   ├── 产出物清单.md        # 按时间/类别索引所有关键文件
+│   ├── 需求沟通记录.md      # 需求池、Roadmap、决策日志
+│   └── GET_STARTED_WINDOWS.md  # Windows 上从零运行/打包指南
 ├── src/
 │   ├── main.ts             # 前端 UI 与全部交互逻辑
 │   ├── style.css           # 透明主题样式

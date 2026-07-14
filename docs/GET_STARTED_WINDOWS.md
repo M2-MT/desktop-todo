@@ -22,7 +22,7 @@
 - 在你的工作区/文件列表里找到 `desktop-todo.zip`，**下载**到你的电脑。
 - 解压到一个**不含中文、不含空格**的路径，推荐：
   - `D:\desktop-todo` （在 D 盘新建文件夹 desktop-todo，把压缩包内容解压进去）
-- 解压后确认里面有这些文件/文件夹：`src`、`src-tauri`、`package.json`、`README.md`、`GET_STARTED_WINDOWS.md`。
+- 解压后确认里面有这些文件/文件夹：`src`、`src-tauri`、`package.json`、`README.md`、`docs/GET_STARTED_WINDOWS.md`。注意：文档现在都统一在 `docs/` 文件夹里。
 
 > ⚠️ 路径不要有中文和空格，否则后面命令会报错。例如 `D:\我的待办` 不行，`D:\desktop-todo` 可以。
 
