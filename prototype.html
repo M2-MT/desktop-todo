@@ -34,8 +34,9 @@
       /* 可拖动的透明窗口卡片 */
       .window {
         width: 380px;
-        min-height: 540px;
-        max-height: 80vh;
+        height: 540px;
+        min-width: 280px;
+        min-height: 300px;
         background: rgba(255, 255, 255, 0.93);
         border-radius: 14px;
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
@@ -105,15 +106,17 @@
       .actions .icon-btn:hover { opacity: 1; }
       .actions .del:hover { color: #e5484d; }
 
-      .resize-grip {
-        position: absolute;
-        right: 0; bottom: 0;
-        width: 18px; height: 18px;
-        cursor: se-resize;
-        background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.25) 50%);
-        border-radius: 0 0 14px 0;
-      }
-      .resize-grip:hover { background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.45) 50%); }
+      /* 窗口四周 + 四角的缩放热区（默认透明，悬停时变光标并高亮） */
+      .rz { position: absolute; z-index: 10; }
+      .rz:hover { background: rgba(255, 193, 7, 0.35); }
+      .rz-n  { top: 0;    left: 14px; right: 14px; height: 6px; cursor: ns-resize;   }
+      .rz-s  { bottom: 0; left: 14px; right: 14px; height: 6px; cursor: ns-resize;   }
+      .rz-e  { right: 0;  top: 14px; bottom: 14px; width: 6px;     cursor: ew-resize; }
+      .rz-w  { left: 0;   top: 14px; bottom: 14px; width: 6px;     cursor: ew-resize; }
+      .rz-ne { top: 0;    right: 0;  width: 18px; height: 18px;    cursor: nesw-resize; }
+      .rz-nw { top: 0;    left: 0;   width: 18px; height: 18px;    cursor: nwse-resize; }
+      .rz-se { bottom: 0; right: 0;  width: 18px; height: 18px;    cursor: nwse-resize; }
+      .rz-sw { bottom: 0; left: 0;   width: 18px; height: 18px;    cursor: nesw-resize; }
 
       .drawer-mask {
         position: fixed; inset: 0; background: rgba(0,0,0,0.25);
@@ -138,7 +141,7 @@
     </style>
   </head>
   <body>
-    <div class="hint-bar">新版原型：可拖拽移动窗口、右下角调整大小、点击列表空白添加、每条待办有「详情」按钮</div>
+    <div class="hint-bar">新版原型：拖顶部栏移动窗口、鼠标悬停四边/四角拖动调整大小、点击列表空白添加待办、每条待办有「详情」按钮</div>
 
     <div class="window" id="win">
       <div class="topbar" id="topbar">
@@ -147,7 +150,14 @@
         <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
       </div>
       <div class="list" id="todoList"></div>
-      <div class="resize-grip" id="resizeGrip" title="拖拽调整大小"></div>
+      <div class="rz rz-n"  data-dir="n"  title="拖动调整高度"></div>
+      <div class="rz rz-s"  data-dir="s"  title="拖动调整高度"></div>
+      <div class="rz rz-e"  data-dir="e"  title="拖动调整宽度"></div>
+      <div class="rz rz-w"  data-dir="w"  title="拖动调整宽度"></div>
+      <div class="rz rz-ne" data-dir="ne" title="拖动调整大小"></div>
+      <div class="rz rz-nw" data-dir="nw" title="拖动调整大小"></div>
+      <div class="rz rz-se" data-dir="se" title="拖动调整大小"></div>
+      <div class="rz rz-sw" data-dir="sw" title="拖动调整大小"></div>
     </div>
 
     <div class="drawer-mask" id="drawerMask">
@@ -229,18 +239,40 @@
         winEl.style.top = e.clientY - dragOffset.y + "px";
       }
 
-      // 调整大小
-      const grip = $("resizeGrip");
-      let resizeStart = { x: 0, y: 0, w: 0, h: 0 };
-      grip.addEventListener("mousedown", (e) => {
-        resizeStart = { x: e.clientX, y: e.clientY, w: winEl.offsetWidth, h: winEl.offsetHeight };
-        document.addEventListener("mousemove", onResize);
-        document.addEventListener("mouseup", () => document.removeEventListener("mousemove", onResize), { once: true });
+      // 调整大小：四边 + 四角 悬停即可拖动（标准窗口手感）
+      const MINW = 280, MINH = 300;
+      const RESIZE_DIRS = {
+        n:  { x: 0,  y: -1 }, s:  { x: 0,  y: 1 },
+        e:  { x: 1,  y: 0 },  w:  { x: -1, y: 0 },
+        ne: { x: 1,  y: -1 }, nw: { x: -1, y: -1 },
+        se: { x: 1,  y: 1 },  sw: { x: -1, y: 1 },
+      };
+      document.querySelectorAll(".rz").forEach((hz) => {
+        hz.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          const dir = RESIZE_DIRS[hz.dataset.dir];
+          const start = {
+            mx: e.clientX, my: e.clientY,
+            w: winEl.offsetWidth, h: winEl.offsetHeight,
+            l: winEl.offsetLeft, t: winEl.offsetTop,
+          };
+          function onResizeMove(ev) {
+            const dx = ev.clientX - start.mx;
+            const dy = ev.clientY - start.my;
+            let w = start.w, h = start.h, l = start.l, t = start.t;
+            if (dir.x === 1) w = Math.max(MINW, start.w + dx);
+            if (dir.x === -1) { w = Math.max(MINW, start.w - dx); l = start.l + (start.w - w); }
+            if (dir.y === 1) h = Math.max(MINH, start.h + dy);
+            if (dir.y === -1) { h = Math.max(MINH, start.h - dy); t = start.t + (start.h - h); }
+            winEl.style.width = w + "px";
+            winEl.style.height = h + "px";
+            winEl.style.left = l + "px";
+            winEl.style.top = t + "px";
+          }
+          document.addEventListener("mousemove", onResizeMove);
+          document.addEventListener("mouseup", () => document.removeEventListener("mousemove", onResizeMove), { once: true });
+        });
       });
-      function onResize(e) {
-        winEl.style.width = Math.max(280, resizeStart.w + e.clientX - resizeStart.x) + "px";
-        winEl.style.height = Math.max(300, resizeStart.h + e.clientY - resizeStart.y) + "px";
-      }
 
       $("todoList").addEventListener("click", (e) => {
         const actEl = e.target.closest("[data-act]");
