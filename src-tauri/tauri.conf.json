@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "桌面待办",
         "width": 400,
         "height": 600,

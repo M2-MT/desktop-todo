@@ -190,7 +190,11 @@ function bind() {
     if (t.closest("select") || t.closest("button") || t.closest(".icon-btn")) return;
     if (!isTauri) return;
     e.preventDefault();
-    win().startDragging();
+    try {
+      win().startDragging();
+    } catch {
+      /* 权限不足时忽略 */
+    }
   });
 
   // 四边 + 四角调整窗口大小（调用 Tauri 原生缩放）
@@ -198,14 +202,22 @@ function bind() {
     hz.addEventListener("mousedown", (e) => {
       if (!isTauri) return;
       e.preventDefault();
-      win().startResizeDragging(RESIZE_DIRS[hz.dataset.dir!]);
+      try {
+        win().startResizeDragging(RESIZE_DIRS[hz.dataset.dir!]);
+      } catch {
+        /* 权限不足时忽略 */
+      }
     });
   });
 
   appEl.querySelector(".hide-btn")?.addEventListener("click", async () => {
     if (isTauri) {
-      await win().hide();
-      hidden = true;
+      try {
+        await win().hide();
+        hidden = true;
+      } catch {
+        /* 权限不足时忽略 */
+      }
     }
   });
   appEl.querySelector(".settings-btn")?.addEventListener("click", () => {
@@ -327,8 +339,12 @@ function bindSettings() {
   if (auto && isTauri) isEnabled().then((on) => (auto.checked = on));
   auto?.addEventListener("change", async () => {
     if (!isTauri) return;
-    if (auto.checked) await enable();
-    else await disable();
+    try {
+      if (auto.checked) await enable();
+      else await disable();
+    } catch (e) {
+      console.warn("设置开机启动失败（可能缺少权限）:", e);
+    }
   });
 }
 
@@ -437,13 +453,21 @@ function saveDetail() {
 
 async function toggleVisible() {
   if (!isTauri) return;
-  if (hidden) {
-    await win().show();
-    await win().setFocus();
-    hidden = false;
-  } else {
-    await win().hide();
-    hidden = true;
+  try {
+    if (hidden) {
+      await win().show();
+      try {
+        await win().setFocus();
+      } catch {
+        /* 忽略 */
+      }
+      hidden = false;
+    } else {
+      await win().hide();
+      hidden = true;
+    }
+  } catch {
+    /* 权限不足时忽略 */
   }
 }
 

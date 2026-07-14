@@ -28,7 +28,12 @@ export async function loadData(): Promise<AppData> {
 /** 持久化数据 */
 export async function saveData(next: AppData): Promise<void> {
   if (isTauri) {
-    await invoke("save_data", { data: JSON.stringify(next) });
+    try {
+      await invoke("save_data", { data: JSON.stringify(next) });
+    } catch (e) {
+      // 即便保存失败（如权限未授权），也不阻断界面操作
+      console.warn("保存数据失败（可能缺少权限）:", e);
+    }
   }
   localStorage.setItem("desktop-todo", JSON.stringify(next));
 }
