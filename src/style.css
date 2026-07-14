@@ -30,6 +30,13 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  /* 默认半透明毛玻璃背景：看得见内容，又能透出壁纸 */
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 /* ---------- 顶部栏（可拖拽移动窗口） ---------- */
