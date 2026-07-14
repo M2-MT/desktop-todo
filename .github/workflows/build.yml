@@ -40,7 +40,7 @@ jobs:
         with:
           tag_name: latest
           name: 桌面待办 自动构建
-          overwrite: true
+          overwrite_files: true
           files: src-tauri/target/release/bundle/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,14 +82,21 @@ jobs:
             exit 0
           fi
 
-          # 2) 上传安装包（.exe / .nsis.zip），遇 502 重试最多 5 次
+          # 2) 上传安装包（.exe / .nsis.zip）。
+          # 注意：Windows Git Bash 的 curl 对“中文路径 + -F file=@”支持有 bug（会 HTTP 000，文件读不出来），
+          # 因此先复制成 ASCII 临时名再上传，绕开该限制。遇 502 网关抖动重试最多 5 次。
           find src-tauri/target/release/bundle -type f \( -name "*.exe" -o -name "*.nsis.zip" \) -print0 | while IFS= read -r -d '' f; do
-            echo "📤 上传: $f"
+            base=$(basename "$f")
+            ext="${base##*.}"
+            if [ "$ext" = "exe" ]; then an="desktoptodo-setup-x64.exe"; else an="desktoptodo-setup-x64.nsis.zip"; fi
+            tmp="/tmp/$an"
+            cp "$f" "$tmp"
+            echo "📤 上传: $base -> 临时名 $an"
             ok=0
             UP=""
             for i in 1 2 3 4 5; do
               UP=$(curl -s -w "\nHTTP:%{http_code}" -X POST "$API/releases/$RID/attach_files" \
-                -F "file=@$f" -F "access_token=$TOKEN")
+                -F "file=@$tmp" -F "access_token=$TOKEN")
               UCODE=$(printf '%s' "$UP" | tail -1 | grep -o '[0-9]*')
               if [ "$UCODE" = "200" ] || [ "$UCODE" = "201" ]; then
                 echo "  ✅ 上传成功 (HTTP $UCODE)"
@@ -99,8 +106,9 @@ jobs:
               echo "  ⚠️ 上传失败 HTTP:$UCODE (第 $i 次尝试)，3 秒后重试"
               sleep 3
             done
+            rm -f "$tmp"
             if [ "$ok" = "0" ]; then
-              echo "::error::附件上传失败: $f，最后响应: $UP"
+              echo "::error::附件上传失败: $base，最后响应: $UP"
             fi
           done
 
