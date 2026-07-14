@@ -1,0 +1,67 @@
+name: Build Windows Release
+
+# 手动触发（由 AI 在需要出新版本时触发），避免每次推送都消耗构建额度
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+        shell: pwsh
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: pnpm install
+        shell: pwsh
+
+      - name: Build Tauri (release)
+        run: pnpm tauri build
+        shell: pwsh
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: latest
+          name: 桌面待办 自动构建
+          files: src-tauri/target/release/bundle/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Gitee Release
+        if: success()
+        shell: bash
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          # 创建 Gitee Release（若 tag 已存在则改为获取已有 Release）
+          RESP=$(curl -s -X POST "https://gitee.com/api/v5/repos/M2-MT/desktop-todo/releases" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token $GITEE_TOKEN" \
+            -d '{"tag_name":"latest","name":"桌面待办 自动构建","body":"由 GitHub Actions 自动构建并同步"}')
+          RELEASE_ID=$(echo "$RESP" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
+          if [ -z "$RELEASE_ID" ]; then
+            RESP=$(curl -s "https://gitee.com/api/v5/repos/M2-MT/desktop-todo/releases/tags/latest" \
+              -H "Authorization: token $GITEE_TOKEN")
+            RELEASE_ID=$(echo "$RESP" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
+          fi
+          echo "Gitee Release ID: $RELEASE_ID"
+          # 上传每个安装包（msi / exe / nsis.zip）
+          for f in $(find src-tauri/target/release/bundle -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.nsis.zip" \)); do
+            echo "Uploading $f"
+            curl -s -X POST "https://gitee.com/api/v5/repos/M2-MT/desktop-todo/releases/$RELEASE_ID/attachments?access_token=$GITEE_TOKEN" \
+              -F "file=@$f"
+          done
