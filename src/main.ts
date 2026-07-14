@@ -1,5 +1,5 @@
 import "./style.css";
-import { getCurrentWindow, type ResizeDirection } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { register } from "@tauri-apps/plugin-global-shortcut";
 import { loadData, saveData } from "./store/db";
@@ -20,6 +20,13 @@ import type { AppData, Todo } from "./lib/types";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const win = () => getCurrentWindow();
+
+// Tauri 缩放方向（与 API 的字符串枚举对齐）
+type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
+const RESIZE_DIRS: Record<string, ResizeDirection> = {
+  n: "North", s: "South", e: "East", w: "West",
+  ne: "NorthEast", nw: "NorthWest", se: "SouthEast", sw: "SouthWest",
+};
 
 let data: AppData = {
   version: 1,
@@ -44,9 +51,6 @@ function escapeHtml(s: string): string {
 }
 function tagName(id: string) {
   return data.tags.find((t) => t.id === id)?.name ?? "";
-}
-function tagColor(id: string) {
-  return data.tags.find((t) => t.id === id)?.color ?? "#999";
 }
 
 // ---------------- 渲染 ----------------
@@ -156,7 +160,14 @@ function render() {
       <button class="icon-btn settings-btn" title="设置">⚙</button>
     </div>
     <div class="list" id="todoList">${rows}</div>
-    <div class="resize-grip" id="resizeGrip" title="拖拽调整窗口大小"></div>
+    <div class="rz rz-n"  data-dir="n"  title="拖拽调整高度"></div>
+    <div class="rz rz-s"  data-dir="s"  title="拖拽调整高度"></div>
+    <div class="rz rz-e"  data-dir="e"  title="拖拽调整宽度"></div>
+    <div class="rz rz-w"  data-dir="w"  title="拖拽调整宽度"></div>
+    <div class="rz rz-ne" data-dir="ne" title="拖拽调整大小"></div>
+    <div class="rz rz-nw" data-dir="nw" title="拖拽调整大小"></div>
+    <div class="rz rz-se" data-dir="se" title="拖拽调整大小"></div>
+    <div class="rz rz-sw" data-dir="sw" title="拖拽调整大小"></div>
     ${drawer}
     ${detail}
   `;
@@ -182,11 +193,13 @@ function bind() {
     win().startDragging();
   });
 
-  // 右下角调整窗口大小
-  appEl.querySelector("#resizeGrip")?.addEventListener("mousedown", (e) => {
-    if (!isTauri) return;
-    e.preventDefault();
-    win().startResizeDragging("se" as ResizeDirection);
+  // 四边 + 四角调整窗口大小（调用 Tauri 原生缩放）
+  appEl.querySelectorAll<HTMLElement>(".rz").forEach((hz) => {
+    hz.addEventListener("mousedown", (e) => {
+      if (!isTauri) return;
+      e.preventDefault();
+      win().startResizeDragging(RESIZE_DIRS[hz.dataset.dir!]);
+    });
   });
 
   appEl.querySelector(".hide-btn")?.addEventListener("click", async () => {
@@ -306,7 +319,8 @@ function bindSettings() {
   });
 
   appEl.querySelector("#opacity")?.addEventListener("input", (e) => {
-    if (isTauri) win().setOpacity(Number((e.target as HTMLInputElement).value));
+    // 透明窗口下，用 CSS 透明度即可达到"窗口半透明"效果（Tauri 与浏览器预览通用）
+    appEl.style.opacity = (e.target as HTMLInputElement).value;
   });
 
   const auto = appEl.querySelector<HTMLInputElement>("#autostart");
